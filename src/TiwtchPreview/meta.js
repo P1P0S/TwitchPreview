@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name        My Script
+// @name        TiwtchPreview
 // @namespace   Violentmonkey Scripts
 // @description Show mini preview of Twitch Stream.
 // @match       *://*.twitch.tv/*

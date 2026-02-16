@@ -5,6 +5,7 @@
 // @match       *://*.twitch.tv/*
 // @grant       GM_addStyle
 // @version     0.0.1
+// @license     MIT
 // @icon        https://external-content.duckduckgo.com/ip3/www.twitch.tv.ico
 // @author      process.env.AUTHOR
 // @require     https://cdn.jsdelivr.net/npm/@violentmonkey/dom@2

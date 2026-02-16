@@ -4,6 +4,7 @@
 // @description Show mini preview of Twitch Stream.
 // @match       *://*.twitch.tv/*
 // @version     0.0.1
+// @license     MIT
 // @icon        https://external-content.duckduckgo.com/ip3/www.twitch.tv.ico
 // @author      Pipos_
 // @require     https://cdn.jsdelivr.net/npm/@violentmonkey/dom@2

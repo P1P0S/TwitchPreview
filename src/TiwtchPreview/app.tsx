@@ -58,6 +58,7 @@ function App() {
   const [getChannel, setChannel] = createSignal<string | null>(null);
   const [isLoading, setIsLoading] = createSignal(false);
   const [isVisible, setIsVisible] = createSignal(false);
+  const [isPinned, setIsPinned] = createSignal(false);
 
   let iframeEl: HTMLIFrameElement | null = null;
   let hoverTimer: number | null = null;
@@ -92,6 +93,7 @@ function App() {
 
   const hidePanel = () => {
     setIsVisible(false);
+    setIsPinned(false);
     setTimeout(() => {
       setChannel(null);
       if (iframeEl) iframeEl.src = '';
@@ -99,6 +101,7 @@ function App() {
   };
 
   const scheduleHide = () => {
+    if (isPinned()) return;
     if (hideTimer) window.clearTimeout(hideTimer);
     hideTimer = window.setTimeout(() => {
       hidePanel();
@@ -159,6 +162,10 @@ function App() {
     }
   };
 
+  const togglePin = () => {
+    setIsPinned(!isPinned());
+  };
+
   window.addEventListener('mouseover', onMouseOver, true);
   window.addEventListener('mouseout', onMouseOut, true);
 
@@ -202,7 +209,6 @@ function App() {
         scheduleHide();
       }}
     >
-      {/* Header */}
       <div
         style={{
           display: 'flex',
@@ -271,6 +277,40 @@ function App() {
           }}
         >
           <button
+            onClick={togglePin}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: '#efeff1',
+              cursor: 'pointer',
+              padding: '4px 8px',
+              'border-radius': '6px',
+              display: 'flex',
+              'align-items': 'center',
+              'justify-content': 'center',
+              transition: 'background 0.2s ease',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'transparent';
+            }}
+            title={isPinned() ? 'Unpin' : 'Pin'}
+          >
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill={isPinned() ? 'currentColor' : 'none'}
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path d="M12 17v5" />
+              <path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z" />
+            </svg>
+          </button>
+          <button
             onClick={openInTwitch}
             style={{
               background: 'transparent',
@@ -291,7 +331,7 @@ function App() {
             onMouseLeave={(e) => {
               e.currentTarget.style.background = 'transparent';
             }}
-            title="Abrir no Twitch"
+            title="Open in new tab"
           >
             <svg
               width="16"
@@ -326,7 +366,7 @@ function App() {
             onMouseLeave={(e) => {
               e.currentTarget.style.background = 'transparent';
             }}
-            title="Fechar"
+            title="Close"
           >
             <svg
               width="16"
@@ -343,7 +383,6 @@ function App() {
         </div>
       </div>
 
-      {/* Loading Indicator */}
       <Show when={isLoading()}>
         <div
           style={{
@@ -381,7 +420,6 @@ function App() {
         </div>
       </Show>
 
-      {/* Iframe */}
       <iframe
         ref={(el) => (iframeEl = el)}
         allow="autoplay; fullscreen"
@@ -396,7 +434,6 @@ function App() {
         }}
       />
 
-      {/* CSS Animations */}
       <style>{`
         @keyframes pulse {
           0%, 100% { opacity: 1; }

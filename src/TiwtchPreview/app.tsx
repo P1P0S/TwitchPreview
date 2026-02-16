@@ -248,6 +248,7 @@ function App() {
         padding: 0,
         'pointer-events': 'auto',
         overflow: 'hidden',
+        'user-select': 'none',
         opacity: isVisible() ? '1' : '0',
         transform: isVisible() ? 'scale(1)' : 'scale(0.95)',
         transition: isDragging()

@@ -59,11 +59,14 @@ function App() {
   const [isLoading, setIsLoading] = createSignal(false);
   const [isVisible, setIsVisible] = createSignal(false);
   const [isPinned, setIsPinned] = createSignal(false);
+  const [isDragging, setIsDragging] = createSignal(false);
 
   let iframeEl: HTMLIFrameElement | null = null;
   let hoverTimer: number | null = null;
   let hideTimer: number | null = null;
   let panelRef: HTMLDivElement | undefined;
+  let dragOffsetX = 0;
+  let dragOffsetY = 0;
 
   const showPanel = (login: string, linkRect: DOMRect) => {
     setChannel(login);
@@ -101,7 +104,7 @@ function App() {
   };
 
   const scheduleHide = () => {
-    if (isPinned()) return;
+    if (isPinned() || isDragging()) return;
     if (hideTimer) window.clearTimeout(hideTimer);
     hideTimer = window.setTimeout(() => {
       hidePanel();
@@ -166,12 +169,62 @@ function App() {
     setIsPinned(!isPinned());
   };
 
+  const onDragStart = (e: MouseEvent) => {
+    e.preventDefault();
+    if (!panelRef) return;
+    setIsDragging(true);
+    dragOffsetX = e.clientX - panelRef.offsetLeft;
+    dragOffsetY = e.clientY - panelRef.offsetTop;
+
+    if (hideTimer) {
+      window.clearTimeout(hideTimer);
+      hideTimer = null;
+    }
+
+    window.addEventListener('mousemove', onDragMove);
+    window.addEventListener('mouseup', onDragEnd);
+  };
+
+  const onDragMove = (e: MouseEvent) => {
+    if (!isDragging() || !panelRef) return;
+    e.preventDefault();
+    let left = e.clientX - dragOffsetX;
+    let top = e.clientY - dragOffsetY;
+
+    left = Math.max(0, Math.min(window.innerWidth - PANEL_WIDTH, left));
+    top = Math.max(0, Math.min(window.innerHeight - PANEL_HEIGHT, top));
+
+    panelRef.style.left = `${left}px`;
+    panelRef.style.top = `${top}px`;
+  };
+
+  const onDragEnd = (e: MouseEvent) => {
+    if (!isDragging()) return;
+    setIsDragging(false);
+    window.removeEventListener('mousemove', onDragMove);
+    window.removeEventListener('mouseup', onDragEnd);
+
+    if (!isPinned() && panelRef) {
+      const rect = panelRef.getBoundingClientRect();
+      if (
+        e.clientX < rect.left ||
+        e.clientX > rect.right ||
+        e.clientY < rect.top ||
+        e.clientY > rect.bottom
+      ) {
+        scheduleHide();
+      }
+    }
+  };
+
   window.addEventListener('mouseover', onMouseOver, true);
   window.addEventListener('mouseout', onMouseOut, true);
 
   onCleanup(() => {
     window.removeEventListener('mouseover', onMouseOver, true);
     window.removeEventListener('mouseout', onMouseOut, true);
+    window.removeEventListener('mousemove', onDragMove);
+    window.removeEventListener('mouseup', onDragEnd);
     clearTimers();
     if (panelRef?.parentNode) {
       panelRef.parentNode.removeChild(panelRef);
@@ -197,7 +250,9 @@ function App() {
         overflow: 'hidden',
         opacity: isVisible() ? '1' : '0',
         transform: isVisible() ? 'scale(1)' : 'scale(0.95)',
-        transition: 'opacity 0.2s ease, transform 0.2s ease',
+        transition: isDragging()
+          ? 'none'
+          : 'opacity 0.2s ease, transform 0.2s ease',
       }}
       onMouseEnter={() => {
         if (hideTimer) {
@@ -269,6 +324,49 @@ function App() {
             LIVE
           </span>
         </div>
+
+        {/* Drag handle button */}
+        <button
+          onMouseDown={onDragStart}
+          style={{
+            background: 'transparent',
+            border: 'none',
+            color: '#efeff1',
+            cursor: 'grab',
+            padding: '4px 8px',
+            'border-radius': '6px',
+            display: 'flex',
+            'align-items': 'center',
+            'justify-content': 'center',
+            transition: 'background 0.2s ease',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'transparent';
+          }}
+          title="Drag to move"
+        >
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <circle cx="12" cy="5" r="1" />
+            <circle cx="19" cy="5" r="1" />
+            <circle cx="5" cy="5" r="1" />
+            <circle cx="12" cy="12" r="1" />
+            <circle cx="19" cy="12" r="1" />
+            <circle cx="5" cy="12" r="1" />
+            <circle cx="12" cy="19" r="1" />
+            <circle cx="19" cy="19" r="1" />
+            <circle cx="5" cy="19" r="1" />
+          </svg>
+        </button>
 
         <div
           style={{

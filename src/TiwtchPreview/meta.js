@@ -9,6 +9,11 @@
 // @author      process.env.AUTHOR
 // @require     https://cdn.jsdelivr.net/npm/@violentmonkey/dom@2
 // @require     https://cdn.jsdelivr.net/npm/@violentmonkey/ui@0.7
+// @downloadURL  https://raw.githubusercontent.com/P1P0S/TwitchPreview/master/dist/TiwtchPreview.user.js
+// @updateURL    https://raw.githubusercontent.com/P1P0S/TwitchPreview/master/dist/TiwtchPreview.user.js
+// @homepageURL  https://github.com/P1P0S/TwitchPreview
+// @supportURL   https://github.com/P1P0S/TwitchPreview/issues
+
 // ==/UserScript==
 
 /**

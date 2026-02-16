@@ -445,8 +445,37 @@ function delegateEvents(eventNames, document = window.document) {
 function setAttribute(node, name, value) {
   if (value == null) node.removeAttribute(name);else node.setAttribute(name, value);
 }
-function setStyleProperty(node, name, value) {
-  value != null ? node.style.setProperty(name, value) : node.style.removeProperty(name);
+function addEventListener(node, name, handler, delegate) {
+  if (delegate) {
+    if (Array.isArray(handler)) {
+      node[`$$${name}`] = handler[0];
+      node[`$$${name}Data`] = handler[1];
+    } else node[`$$${name}`] = handler;
+  } else if (Array.isArray(handler)) {
+    const handlerFn = handler[0];
+    node.addEventListener(name, handler[0] = e => handlerFn.call(node, handler[1], e));
+  } else node.addEventListener(name, handler, typeof handler !== "function" && handler);
+}
+function style(node, value, prev) {
+  if (!value) return prev ? setAttribute(node, "style") : value;
+  const nodeStyle = node.style;
+  if (typeof value === "string") return nodeStyle.cssText = value;
+  typeof prev === "string" && (nodeStyle.cssText = prev = undefined);
+  prev || (prev = {});
+  value || (value = {});
+  let v, s;
+  for (s in prev) {
+    value[s] == null && nodeStyle.removeProperty(s);
+    delete prev[s];
+  }
+  for (s in value) {
+    v = value[s];
+    if (v !== prev[s]) {
+      nodeStyle.setProperty(s, v);
+      prev[s] = v;
+    }
+  }
+  return prev;
 }
 function use(fn, element, arg) {
   return untrack(() => fn(element, arg));
@@ -608,12 +637,12 @@ function cleanChildren(parent, current, marker, replacement) {
   return [node];
 }
 
-var _tmpl$ = /*#__PURE__*/template(`<div style="position:absolute;top:50%;left:50%;transform:translate(-50%, -50%);z-index:10;display:flex;flex-direction:column;align-items:center;gap:12px"><div style="width:32px;height:32px;border:3px solid rgba(145, 71, 255, 0.2);border-top-color:#9147ff;border-radius:50%;animation:spin 0.8s linear infinite"></div><span style="color:#efeff1;font-size:12px;font-family:Inter, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, Roboto, sans-serif">Carregando...`),
-  _tmpl$2 = /*#__PURE__*/template(`<div style="position:fixed;z-index:999999;width:460px;height:290px;background:#18181b;border:1px solid #323237;border-radius:12px;box-shadow:0 8px 32px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.05);padding:0;pointer-events:auto;overflow:hidden;user-select:none"><div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:linear-gradient(to bottom, #1f1f23, #18181b);border-bottom:1px solid #323237"><div style=display:flex;align-items:center;gap:8px;flex:1;min-width:0><div style="width:8px;height:8px;border-radius:50%;background:#ff4655;box-shadow:0 0 8px rgba(255, 70, 85, 0.6);animation:pulse 2s ease-in-out infinite"></div><span style="color:#efeff1;font-size:14px;font-weight:600;font-family:Inter, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, Roboto, sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></span><span style="color:#fff;font-size:10px;font-weight:700;font-family:Inter, -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, Roboto, sans-serif;text-transform:uppercase;background:#e91916;padding:2px 6px;border-radius:4px;letter-spacing:0.5px">LIVE</span></div><button title="Drag to move"style="background:transparent;border:none;color:#efeff1;cursor:grab;padding:4px 8px;border-radius:6px;display:flex;align-items:center;justify-content:center;transition:background 0.2s ease"><svg width=16 height=16 viewBox="0 0 24 24"fill=none stroke=currentColor stroke-width=2><circle cx=12 cy=5 r=1></circle><circle cx=19 cy=5 r=1></circle><circle cx=5 cy=5 r=1></circle><circle cx=12 cy=12 r=1></circle><circle cx=19 cy=12 r=1></circle><circle cx=5 cy=12 r=1></circle><circle cx=12 cy=19 r=1></circle><circle cx=19 cy=19 r=1></circle><circle cx=5 cy=19 r=1></circle></svg></button><div style=display:flex;gap:6px><button style="background:transparent;border:none;color:#efeff1;cursor:pointer;padding:4px 8px;border-radius:6px;display:flex;align-items:center;justify-content:center;transition:background 0.2s ease"><svg width=16 height=16 viewBox="0 0 24 24"stroke=currentColor stroke-width=2><path d="M12 17v5"></path><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"></path></svg></button><button title="Open in new tab"style="background:transparent;border:none;color:#efeff1;cursor:pointer;padding:4px 8px;border-radius:6px;display:flex;align-items:center;justify-content:center;transition:background 0.2s ease;font-size:12px"><svg width=16 height=16 viewBox="0 0 24 24"fill=none stroke=currentColor stroke-width=2><path d="M15 3h6v6"></path><path d="M10 14 21 3"></path><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path></svg></button><button title=Close style="background:transparent;border:none;color:#efeff1;cursor:pointer;padding:4px 8px;border-radius:6px;display:flex;align-items:center;justify-content:center;transition:background 0.2s ease"><svg width=16 height=16 viewBox="0 0 24 24"fill=none stroke=currentColor stroke-width=2><circle cx=12 cy=12 r=10></circle><path d="m15 9-6 6"></path><path d="m9 9 6 6"></path></svg></button></div></div><iframe allow="autoplay; fullscreen"allowfullscreen loading=eager style="width:100%;height:calc(100% - 40px);border:0;display:block;background:#0e0e10"></iframe><style>\n        @keyframes pulse \{\n          0%, 100% \{ opacity: 1; }\n          50% \{ opacity: 0.5; }\n        }\n        @keyframes spin \{\n          to \{ transform: rotate(360deg); }\n        }\n      `, true, false, false);
 const PANEL_WIDTH = 460;
 const PANEL_HEIGHT = 290;
 const HOVER_DELAY = 120;
 const HIDE_DELAY = 300;
+const BLOCKED_ROUTES = new Set(['directory', 'downloads', 'jobs', 'p', 'search', 'settings', 'subscriptions', 'turbo', 'wallet', 'videos']);
+
 function getTwitchParent() {
   return window.location.hostname;
 }
@@ -629,8 +658,7 @@ function extractChannelLoginFromLink(a) {
   const parts = clean.split('/').filter(Boolean);
   if (!parts.length) return null;
   const login = parts[0];
-  const blocked = new Set(['directory', 'downloads', 'jobs', 'p', 'search', 'settings', 'subscriptions', 'turbo', 'wallet', 'videos']);
-  if (blocked.has(login)) return null;
+  if (BLOCKED_ROUTES.has(login)) return null;
   if (!/^[a-z0-9_]{2,25}$/i.test(login)) return null;
   return login;
 }
@@ -644,18 +672,122 @@ function isSidebarChannelLink(a) {
   const rect = nav.getBoundingClientRect();
   return rect.left < 80 && rect.width < 500;
 }
-function App() {
+
+function useDrag(onDragEndOutside) {
+  const [isDragging, setIsDragging] = createSignal(false);
+  let dragOffsetX = 0;
+  let dragOffsetY = 0;
+  let currentPanelRef = null;
+  const onDragMove = e => {
+    if (!isDragging() || !currentPanelRef) return;
+    e.preventDefault();
+    let left = e.clientX - dragOffsetX;
+    let top = e.clientY - dragOffsetY;
+    left = Math.max(0, Math.min(window.innerWidth - PANEL_WIDTH, left));
+    top = Math.max(0, Math.min(window.innerHeight - PANEL_HEIGHT, top));
+    currentPanelRef.style.left = `${left}px`;
+    currentPanelRef.style.top = `${top}px`;
+  };
+  const onDragEnd = e => {
+    if (!isDragging()) return;
+    setIsDragging(false);
+    window.removeEventListener('mousemove', onDragMove);
+    window.removeEventListener('mouseup', onDragEnd);
+    if (currentPanelRef) {
+      const rect = currentPanelRef.getBoundingClientRect();
+      const isOutside = e.clientX < rect.left || e.clientX > rect.right || e.clientY < rect.top || e.clientY > rect.bottom;
+      if (isOutside) {
+        onDragEndOutside();
+      }
+    }
+  };
+  const onDragStart = (e, panelRef) => {
+    e.preventDefault();
+    currentPanelRef = panelRef;
+    setIsDragging(true);
+    dragOffsetX = e.clientX - panelRef.offsetLeft;
+    dragOffsetY = e.clientY - panelRef.offsetTop;
+    window.addEventListener('mousemove', onDragMove);
+    window.addEventListener('mouseup', onDragEnd);
+  };
+  const cleanupDrag = () => {
+    window.removeEventListener('mousemove', onDragMove);
+    window.removeEventListener('mouseup', onDragEnd);
+  };
+  return {
+    isDragging,
+    onDragStart,
+    cleanupDrag
+  };
+}
+
+function useTimers() {
+  let hoverTimer = null;
+  let hideTimer = null;
+  const cancelHide = () => {
+    if (hideTimer) {
+      window.clearTimeout(hideTimer);
+      hideTimer = null;
+    }
+  };
+  const cancelHover = () => {
+    if (hoverTimer) {
+      window.clearTimeout(hoverTimer);
+      hoverTimer = null;
+    }
+  };
+  const scheduleHide = callback => {
+    cancelHide();
+    hideTimer = window.setTimeout(() => {
+      callback();
+      hideTimer = null;
+    }, HIDE_DELAY);
+  };
+  const setHoverTimer = (callback, delay) => {
+    cancelHover();
+    hoverTimer = window.setTimeout(() => {
+      callback();
+      hoverTimer = null;
+    }, delay);
+  };
+  const clearAllTimers = () => {
+    cancelHide();
+    cancelHover();
+  };
+  return {
+    scheduleHide,
+    cancelHide,
+    setHoverTimer,
+    cancelHover,
+    clearAllTimers
+  };
+}
+
+function usePreviewPanel() {
   const [getChannel, setChannel] = createSignal(null);
   const [isLoading, setIsLoading] = createSignal(false);
   const [isVisible, setIsVisible] = createSignal(false);
   const [isPinned, setIsPinned] = createSignal(false);
-  const [isDragging, setIsDragging] = createSignal(false);
   let iframeEl = null;
-  let hoverTimer = null;
-  let hideTimer = null;
   let panelRef;
-  let dragOffsetX = 0;
-  let dragOffsetY = 0;
+  const timers = useTimers();
+  const hidePanel = () => {
+    setIsVisible(false);
+    setIsPinned(false);
+    setTimeout(() => {
+      setChannel(null);
+      if (iframeEl) iframeEl.src = '';
+    }, 200);
+  };
+  const requestHide = () => {
+    if (isPinned() || drag.isDragging()) return;
+    timers.scheduleHide(hidePanel);
+  };
+  const drag = useDrag(() => {
+    if (!isPinned()) {
+      requestHide();
+    }
+  });
   const showPanel = (login, linkRect) => {
     setChannel(login);
     setIsLoading(true);
@@ -677,59 +809,23 @@ function App() {
     panelRef.style.left = `${left}px`;
     panelRef.style.top = `${top}px`;
   };
-  const hidePanel = () => {
-    setIsVisible(false);
-    setIsPinned(false);
-    setTimeout(() => {
-      setChannel(null);
-      if (iframeEl) iframeEl.src = '';
-    }, 200);
-  };
-  const scheduleHide = () => {
-    if (isPinned() || isDragging()) return;
-    if (hideTimer) window.clearTimeout(hideTimer);
-    hideTimer = window.setTimeout(() => {
-      hidePanel();
-      hideTimer = null;
-    }, HIDE_DELAY);
-  };
-  const clearTimers = () => {
-    if (hoverTimer) {
-      window.clearTimeout(hoverTimer);
-      hoverTimer = null;
-    }
-    if (hideTimer) {
-      window.clearTimeout(hideTimer);
-      hideTimer = null;
-    }
-  };
   const onMouseOver = ev => {
     const a = findAnchorFromTarget(ev.target);
-    if (!a) return;
-    if (!isSidebarChannelLink(a)) return;
+    if (!a || !isSidebarChannelLink(a)) return;
     const login = extractChannelLoginFromLink(a);
     if (!login) return;
-    if (hideTimer) {
-      window.clearTimeout(hideTimer);
-      hideTimer = null;
-    }
+    timers.cancelHide();
     if (getChannel() === login) return;
-    if (hoverTimer) window.clearTimeout(hoverTimer);
-    hoverTimer = window.setTimeout(() => {
+    timers.setHoverTimer(() => {
       const rect = a.getBoundingClientRect();
       showPanel(login, rect);
-      hoverTimer = null;
     }, HOVER_DELAY);
   };
   const onMouseOut = ev => {
     const a = findAnchorFromTarget(ev.target);
-    if (!a) return;
-    if (!isSidebarChannelLink(a)) return;
-    if (hoverTimer) {
-      window.clearTimeout(hoverTimer);
-      hoverTimer = null;
-    }
-    scheduleHide();
+    if (!a || !isSidebarChannelLink(a)) return;
+    timers.cancelHover();
+    requestHide();
   };
   const openInTwitch = () => {
     const ch = getChannel();
@@ -740,132 +836,263 @@ function App() {
   const togglePin = () => {
     setIsPinned(!isPinned());
   };
-  const onDragStart = e => {
-    e.preventDefault();
+  const handlePanelMouseEnter = () => {
+    timers.cancelHide();
+  };
+  const handlePanelMouseLeave = () => {
+    requestHide();
+  };
+  const handleDragStart = e => {
     if (!panelRef) return;
-    setIsDragging(true);
-    dragOffsetX = e.clientX - panelRef.offsetLeft;
-    dragOffsetY = e.clientY - panelRef.offsetTop;
-    if (hideTimer) {
-      window.clearTimeout(hideTimer);
-      hideTimer = null;
-    }
-    window.addEventListener('mousemove', onDragMove);
-    window.addEventListener('mouseup', onDragEnd);
+    timers.cancelHide();
+    drag.onDragStart(e, panelRef);
   };
-  const onDragMove = e => {
-    if (!isDragging() || !panelRef) return;
-    e.preventDefault();
-    let left = e.clientX - dragOffsetX;
-    let top = e.clientY - dragOffsetY;
-    left = Math.max(0, Math.min(window.innerWidth - PANEL_WIDTH, left));
-    top = Math.max(0, Math.min(window.innerHeight - PANEL_HEIGHT, top));
-    panelRef.style.left = `${left}px`;
-    panelRef.style.top = `${top}px`;
-  };
-  const onDragEnd = e => {
-    if (!isDragging()) return;
-    setIsDragging(false);
-    window.removeEventListener('mousemove', onDragMove);
-    window.removeEventListener('mouseup', onDragEnd);
-    if (!isPinned() && panelRef) {
-      const rect = panelRef.getBoundingClientRect();
-      if (e.clientX < rect.left || e.clientX > rect.right || e.clientY < rect.top || e.clientY > rect.bottom) {
-        scheduleHide();
-      }
-    }
-  };
+
+  // Register global listeners
   window.addEventListener('mouseover', onMouseOver, true);
   window.addEventListener('mouseout', onMouseOut, true);
   onCleanup(() => {
+    var _panelRef;
     window.removeEventListener('mouseover', onMouseOver, true);
     window.removeEventListener('mouseout', onMouseOut, true);
-    window.removeEventListener('mousemove', onDragMove);
-    window.removeEventListener('mouseup', onDragEnd);
-    clearTimers();
-    if (panelRef != null && panelRef.parentNode) {
+    drag.cleanupDrag();
+    timers.clearAllTimers();
+    if ((_panelRef = panelRef) != null && _panelRef.parentNode) {
       panelRef.parentNode.removeChild(panelRef);
     }
   });
+  return {
+    // Signals
+    getChannel,
+    isLoading,
+    isVisible,
+    isPinned,
+    isDragging: drag.isDragging,
+    // Refs
+    setIframeRef: el => {
+      iframeEl = el;
+    },
+    setPanelRef: el => {
+      panelRef = el;
+    },
+    // Actions
+    hidePanel,
+    openInTwitch,
+    togglePin,
+    handlePanelMouseEnter,
+    handlePanelMouseLeave,
+    handleDragStart
+  };
+}
+
+function _extends() {
+  return _extends = Object.assign ? Object.assign.bind() : function (n) {
+    for (var e = 1; e < arguments.length; e++) {
+      var t = arguments[e];
+      for (var r in t) ({}).hasOwnProperty.call(t, r) && (n[r] = t[r]);
+    }
+    return n;
+  }, _extends.apply(null, arguments);
+}
+
+const FONT_STACK = 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+function panelStyle(isVisible, isDragging, hasChannel) {
+  return {
+    position: 'fixed',
+    'z-index': 999999,
+    display: hasChannel ? 'block' : 'none',
+    width: `${PANEL_WIDTH}px`,
+    height: `${PANEL_HEIGHT}px`,
+    background: '#18181b',
+    border: '1px solid #323237',
+    'border-radius': '12px',
+    'box-shadow': '0 8px 32px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.05)',
+    padding: 0,
+    'pointer-events': 'auto',
+    overflow: 'hidden',
+    'user-select': 'none',
+    opacity: isVisible ? '1' : '0',
+    transform: isVisible ? 'scale(1)' : 'scale(0.95)',
+    transition: isDragging ? 'none' : 'opacity 0.2s ease, transform 0.2s ease'
+  };
+}
+const headerStyle = {
+  display: 'flex',
+  'align-items': 'center',
+  'justify-content': 'space-between',
+  padding: '10px 12px',
+  background: 'linear-gradient(to bottom, #1f1f23, #18181b)',
+  'border-bottom': '1px solid #323237'
+};
+const headerLeftStyle = {
+  display: 'flex',
+  'align-items': 'center',
+  gap: '8px',
+  flex: 1,
+  'min-width': 0
+};
+const liveDotStyle = {
+  width: '8px',
+  height: '8px',
+  'border-radius': '50%',
+  background: '#ff4655',
+  'box-shadow': '0 0 8px rgba(255, 70, 85, 0.6)',
+  animation: 'pulse 2s ease-in-out infinite'
+};
+const channelNameStyle = {
+  color: '#efeff1',
+  'font-size': '14px',
+  'font-weight': '600',
+  'font-family': FONT_STACK,
+  'white-space': 'nowrap',
+  overflow: 'hidden',
+  'text-overflow': 'ellipsis'
+};
+const liveBadgeStyle = {
+  color: '#fff',
+  'font-size': '10px',
+  'font-weight': '700',
+  'font-family': FONT_STACK,
+  'text-transform': 'uppercase',
+  background: '#e91916',
+  padding: '2px 6px',
+  'border-radius': '4px',
+  'letter-spacing': '0.5px'
+};
+const buttonGroupStyle = {
+  display: 'flex',
+  gap: '6px'
+};
+const iconButtonStyle = {
+  background: 'transparent',
+  border: 'none',
+  color: '#efeff1',
+  cursor: 'pointer',
+  padding: '4px 8px',
+  'border-radius': '6px',
+  display: 'flex',
+  'align-items': 'center',
+  'justify-content': 'center',
+  transition: 'background 0.2s ease'
+};
+const dragButtonStyle = _extends({}, iconButtonStyle, {
+  cursor: 'grab'
+});
+const loaderOverlayStyle = {
+  position: 'absolute',
+  top: '50%',
+  left: '50%',
+  transform: 'translate(-50%, -50%)',
+  'z-index': 10,
+  display: 'flex',
+  'flex-direction': 'column',
+  'align-items': 'center',
+  gap: '12px'
+};
+const spinnerStyle = {
+  width: '32px',
+  height: '32px',
+  border: '3px solid rgba(145, 71, 255, 0.2)',
+  'border-top-color': '#9147ff',
+  'border-radius': '50%',
+  animation: 'spin 0.8s linear infinite'
+};
+const loaderTextStyle = {
+  color: '#efeff1',
+  'font-size': '12px',
+  'font-family': FONT_STACK
+};
+const iframeStyle = {
+  width: '100%',
+  height: 'calc(100% - 40px)',
+  border: 0,
+  display: 'block',
+  background: '#0e0e10'
+};
+function applyHover(e) {
+  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+}
+function removeHover(e) {
+  e.currentTarget.style.background = 'transparent';
+}
+
+var _tmpl$$1 = /*#__PURE__*/template(`<svg width=16 height=16 viewBox="0 0 24 24"fill=none stroke=currentColor stroke-width=2><circle cx=12 cy=5 r=1></circle><circle cx=19 cy=5 r=1></circle><circle cx=5 cy=5 r=1></circle><circle cx=12 cy=12 r=1></circle><circle cx=19 cy=12 r=1></circle><circle cx=5 cy=12 r=1></circle><circle cx=12 cy=19 r=1></circle><circle cx=19 cy=19 r=1></circle><circle cx=5 cy=19 r=1>`),
+  _tmpl$2$1 = /*#__PURE__*/template(`<svg width=16 height=16 viewBox="0 0 24 24"stroke=currentColor stroke-width=2><path d="M12 17v5"></path><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z">`),
+  _tmpl$3 = /*#__PURE__*/template(`<svg width=16 height=16 viewBox="0 0 24 24"fill=none stroke=currentColor stroke-width=2><path d="M15 3h6v6"></path><path d="M10 14 21 3"></path><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6">`),
+  _tmpl$4 = /*#__PURE__*/template(`<svg width=16 height=16 viewBox="0 0 24 24"fill=none stroke=currentColor stroke-width=2><circle cx=12 cy=12 r=10></circle><path d="m15 9-6 6"></path><path d="m9 9 6 6">`),
+  _tmpl$5 = /*#__PURE__*/template(`<div><div><div></div><span></span><span>LIVE</span></div><button title="Drag to move"></button><div><button></button><button title="Open in new tab"></button><button title=Close>`);
+function DragIcon() {
+  return _tmpl$$1();
+}
+function PinIcon(props) {
   return (() => {
-    var _el$ = _tmpl$2(),
-      _el$2 = _el$.firstChild,
-      _el$3 = _el$2.firstChild,
-      _el$4 = _el$3.firstChild,
-      _el$5 = _el$4.nextSibling;
-      _el$5.nextSibling;
-      var _el$7 = _el$3.nextSibling,
+    var _el$2 = _tmpl$2$1();
+    createRenderEffect(() => setAttribute(_el$2, "fill", props.filled ? 'currentColor' : 'none'));
+    return _el$2;
+  })();
+}
+function ExternalLinkIcon() {
+  return _tmpl$3();
+}
+function CloseIcon() {
+  return _tmpl$4();
+}
+function HeaderBar(props) {
+  return (() => {
+    var _el$5 = _tmpl$5(),
+      _el$6 = _el$5.firstChild,
+      _el$7 = _el$6.firstChild,
       _el$8 = _el$7.nextSibling,
-      _el$9 = _el$8.firstChild,
-      _el$0 = _el$9.firstChild,
-      _el$1 = _el$9.nextSibling,
-      _el$10 = _el$1.nextSibling,
-      _el$14 = _el$2.nextSibling;
-    _el$.addEventListener("mouseleave", () => {
-      scheduleHide();
-    });
-    _el$.addEventListener("mouseenter", () => {
-      if (hideTimer) {
-        window.clearTimeout(hideTimer);
-        hideTimer = null;
+      _el$9 = _el$8.nextSibling,
+      _el$0 = _el$6.nextSibling,
+      _el$1 = _el$0.nextSibling,
+      _el$10 = _el$1.firstChild,
+      _el$11 = _el$10.nextSibling,
+      _el$12 = _el$11.nextSibling;
+    insert(_el$8, () => props.channel());
+    addEventListener(_el$0, "mouseleave", removeHover);
+    addEventListener(_el$0, "mouseenter", applyHover);
+    addEventListener(_el$0, "mousedown", props.onDragStart, true);
+    insert(_el$0, createComponent(DragIcon, {}));
+    addEventListener(_el$10, "mouseleave", removeHover);
+    addEventListener(_el$10, "mouseenter", applyHover);
+    addEventListener(_el$10, "click", props.onTogglePin, true);
+    insert(_el$10, createComponent(PinIcon, {
+      get filled() {
+        return props.isPinned();
       }
-    });
-    var _ref$ = panelRef;
-    typeof _ref$ === "function" ? use(_ref$, _el$) : panelRef = _el$;
-    insert(_el$5, getChannel);
-    _el$7.addEventListener("mouseleave", e => {
-      e.currentTarget.style.background = 'transparent';
-    });
-    _el$7.addEventListener("mouseenter", e => {
-      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
-    });
-    _el$7.$$mousedown = onDragStart;
-    _el$9.addEventListener("mouseleave", e => {
-      e.currentTarget.style.background = 'transparent';
-    });
-    _el$9.addEventListener("mouseenter", e => {
-      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
-    });
-    _el$9.$$click = togglePin;
-    _el$1.addEventListener("mouseleave", e => {
-      e.currentTarget.style.background = 'transparent';
-    });
-    _el$1.addEventListener("mouseenter", e => {
-      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
-    });
-    _el$1.$$click = openInTwitch;
-    _el$10.addEventListener("mouseleave", e => {
-      e.currentTarget.style.background = 'transparent';
-    });
-    _el$10.addEventListener("mouseenter", e => {
-      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
-    });
-    _el$10.$$click = hidePanel;
-    insert(_el$, createComponent(Show, {
-      get when() {
-        return isLoading();
-      },
-      get children() {
-        var _el$11 = _tmpl$(),
-          _el$12 = _el$11.firstChild;
-          _el$12.nextSibling;
-        return _el$11;
-      }
-    }), _el$14);
-    use(el => iframeEl = el, _el$14);
+    }));
+    addEventListener(_el$11, "mouseleave", removeHover);
+    addEventListener(_el$11, "mouseenter", applyHover);
+    addEventListener(_el$11, "click", props.onOpenInTwitch, true);
+    insert(_el$11, createComponent(ExternalLinkIcon, {}));
+    addEventListener(_el$12, "mouseleave", removeHover);
+    addEventListener(_el$12, "mouseenter", applyHover);
+    addEventListener(_el$12, "click", props.onClose, true);
+    insert(_el$12, createComponent(CloseIcon, {}));
     createRenderEffect(_p$ => {
-      var _v$ = getChannel() ? 'block' : 'none',
-        _v$2 = isVisible() ? '1' : '0',
-        _v$3 = isVisible() ? 'scale(1)' : 'scale(0.95)',
-        _v$4 = isDragging() ? 'none' : 'opacity 0.2s ease, transform 0.2s ease',
-        _v$5 = isPinned() ? 'Unpin' : 'Pin',
-        _v$6 = isPinned() ? 'currentColor' : 'none';
-      _v$ !== _p$.e && setStyleProperty(_el$, "display", _p$.e = _v$);
-      _v$2 !== _p$.t && setStyleProperty(_el$, "opacity", _p$.t = _v$2);
-      _v$3 !== _p$.a && setStyleProperty(_el$, "transform", _p$.a = _v$3);
-      _v$4 !== _p$.o && setStyleProperty(_el$, "transition", _p$.o = _v$4);
-      _v$5 !== _p$.i && setAttribute(_el$9, "title", _p$.i = _v$5);
-      _v$6 !== _p$.n && setAttribute(_el$0, "fill", _p$.n = _v$6);
+      var _v$ = headerStyle,
+        _v$2 = headerLeftStyle,
+        _v$3 = liveDotStyle,
+        _v$4 = channelNameStyle,
+        _v$5 = liveBadgeStyle,
+        _v$6 = dragButtonStyle,
+        _v$7 = buttonGroupStyle,
+        _v$8 = iconButtonStyle,
+        _v$9 = props.isPinned() ? 'Unpin' : 'Pin',
+        _v$0 = iconButtonStyle,
+        _v$1 = iconButtonStyle;
+      _p$.e = style(_el$5, _v$, _p$.e);
+      _p$.t = style(_el$6, _v$2, _p$.t);
+      _p$.a = style(_el$7, _v$3, _p$.a);
+      _p$.o = style(_el$8, _v$4, _p$.o);
+      _p$.i = style(_el$9, _v$5, _p$.i);
+      _p$.n = style(_el$0, _v$6, _p$.n);
+      _p$.s = style(_el$1, _v$7, _p$.s);
+      _p$.h = style(_el$10, _v$8, _p$.h);
+      _v$9 !== _p$.r && setAttribute(_el$10, "title", _p$.r = _v$9);
+      _p$.d = style(_el$11, _v$0, _p$.d);
+      _p$.l = style(_el$12, _v$1, _p$.l);
       return _p$;
     }, {
       e: undefined,
@@ -873,7 +1100,84 @@ function App() {
       a: undefined,
       o: undefined,
       i: undefined,
-      n: undefined
+      n: undefined,
+      s: undefined,
+      h: undefined,
+      r: undefined,
+      d: undefined,
+      l: undefined
+    });
+    return _el$5;
+  })();
+}
+delegateEvents(["mousedown", "click"]);
+
+var _tmpl$ = /*#__PURE__*/template(`<div><div></div><span>Carregando...`),
+  _tmpl$2 = /*#__PURE__*/template(`<div><iframe allow="autoplay; fullscreen"allowfullscreen loading=eager></iframe><style>\n        @keyframes pulse \{\n          0%, 100% \{ opacity: 1; }\n          50% \{ opacity: 0.5; }\n        }\n        @keyframes spin \{\n          to \{ transform: rotate(360deg); }\n        }\n      `, true, false, false);
+function App() {
+  const panel = usePreviewPanel();
+  return (() => {
+    var _el$ = _tmpl$2(),
+      _el$5 = _el$.firstChild;
+    addEventListener(_el$, "mouseleave", panel.handlePanelMouseLeave);
+    addEventListener(_el$, "mouseenter", panel.handlePanelMouseEnter);
+    var _ref$ = panel.setPanelRef;
+    typeof _ref$ === "function" ? use(_ref$, _el$) : panel.setPanelRef = _el$;
+    insert(_el$, createComponent(HeaderBar, {
+      get channel() {
+        return panel.getChannel;
+      },
+      get isPinned() {
+        return panel.isPinned;
+      },
+      get onDragStart() {
+        return panel.handleDragStart;
+      },
+      get onTogglePin() {
+        return panel.togglePin;
+      },
+      get onOpenInTwitch() {
+        return panel.openInTwitch;
+      },
+      get onClose() {
+        return panel.hidePanel;
+      }
+    }), _el$5);
+    insert(_el$, createComponent(Show, {
+      get when() {
+        return panel.isLoading();
+      },
+      get children() {
+        var _el$2 = _tmpl$(),
+          _el$3 = _el$2.firstChild,
+          _el$4 = _el$3.nextSibling;
+        createRenderEffect(_p$ => {
+          var _v$ = loaderOverlayStyle,
+            _v$2 = spinnerStyle,
+            _v$3 = loaderTextStyle;
+          _p$.e = style(_el$2, _v$, _p$.e);
+          _p$.t = style(_el$3, _v$2, _p$.t);
+          _p$.a = style(_el$4, _v$3, _p$.a);
+          return _p$;
+        }, {
+          e: undefined,
+          t: undefined,
+          a: undefined
+        });
+        return _el$2;
+      }
+    }), _el$5);
+    var _ref$2 = panel.setIframeRef;
+    typeof _ref$2 === "function" ? use(_ref$2, _el$5) : panel.setIframeRef = _el$5;
+    createRenderEffect(_p$ => {
+      var _v$4 = panelStyle(panel.isVisible(), panel.isDragging(), !!panel.getChannel()),
+        _v$5 = iframeStyle;
+      _p$.e = style(_el$, _v$4, _p$.e);
+      _p$.t = style(_el$5, _v$5, _p$.t);
+      return _p$;
+    }, {
+      e: undefined,
+      t: undefined
     });
     return _el$;
   })();
@@ -881,6 +1185,5 @@ function App() {
 const root = document.createElement('div');
 document.body.appendChild(root);
 render(() => createComponent(App, {}), root);
-delegateEvents(["mousedown", "click"]);
 
 })();

@@ -95,7 +95,7 @@ function App() {
     setTimeout(() => {
       setChannel(null);
       if (iframeEl) iframeEl.src = '';
-    }, 200); // Aguarda animação de saída
+    }, 200);
   };
 
   const scheduleHide = () => {
@@ -248,18 +248,19 @@ function App() {
           </span>
           <span
             style={{
-              color: '#bf94ff',
-              'font-size': '11px',
-              'font-weight': '600',
+              color: '#fff',
+              'font-size': '10px',
+              'font-weight': '700',
               'font-family':
                 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
               'text-transform': 'uppercase',
-              background: 'rgba(191, 148, 255, 0.15)',
+              background: '#e91916',
               padding: '2px 6px',
               'border-radius': '4px',
+              'letter-spacing': '0.5px',
             }}
           >
-            AO VIVO
+            LIVE
           </span>
         </div>
 

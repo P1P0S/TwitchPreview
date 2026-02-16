@@ -4,7 +4,8 @@
 // @description Show mini preview of Twitch Stream.
 // @match       *://*.twitch.tv/*
 // @grant       GM_addStyle
-// @version     0.0.0
+// @version     0.0.1
+// @icon        https://external-content.duckduckgo.com/ip3/www.twitch.tv.ico
 // @author      process.env.AUTHOR
 // @require     https://cdn.jsdelivr.net/npm/@violentmonkey/dom@2
 // @require     https://cdn.jsdelivr.net/npm/@violentmonkey/ui@0.7

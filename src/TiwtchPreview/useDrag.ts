@@ -21,8 +21,8 @@ export function useDrag(onDragEndOutside: () => void): DragActions {
     let left = e.clientX - dragOffsetX;
     let top = e.clientY - dragOffsetY;
 
-    left = Math.max(0, Math.min(window.innerWidth - PANEL_WIDTH, left));
-    top = Math.max(0, Math.min(window.innerHeight - PANEL_HEIGHT, top));
+    left = Math.max(0, Math.min(window.innerWidth - PANEL_WIDTH(), left));
+    top = Math.max(0, Math.min(window.innerHeight - PANEL_HEIGHT(), top));
 
     currentPanelRef.style.left = `${left}px`;
     currentPanelRef.style.top = `${top}px`;

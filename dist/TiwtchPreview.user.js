@@ -14,6 +14,8 @@
 // @homepageURL https://github.com/P1P0S/TwitchPreview
 // @supportURL  https://github.com/P1P0S/TwitchPreview/issues
 // @grant       GM_addStyle
+// @grant       GM_getValue
+// @grant       GM_setValue
 // ==/UserScript==
 
 (function () {
@@ -21,6 +23,7 @@
 
 const IS_DEV = false;
 const equalFn = (a, b) => a === b;
+const $TRACK = Symbol("solid-track");
 const signalOptions = {
   equals: equalFn
 };
@@ -327,11 +330,117 @@ function handleError(err, owner = Owner) {
   const error = castError(err);
   throw error;
 }
+
+const FALLBACK = Symbol("fallback");
+function dispose(d) {
+  for (let i = 0; i < d.length; i++) d[i]();
+}
+function mapArray(list, mapFn, options = {}) {
+  let items = [],
+    mapped = [],
+    disposers = [],
+    len = 0,
+    indexes = mapFn.length > 1 ? [] : null;
+  onCleanup(() => dispose(disposers));
+  return () => {
+    let newItems = list() || [],
+      newLen = newItems.length,
+      i,
+      j;
+    newItems[$TRACK];
+    return untrack(() => {
+      let newIndices, newIndicesNext, temp, tempdisposers, tempIndexes, start, end, newEnd, item;
+      if (newLen === 0) {
+        if (len !== 0) {
+          dispose(disposers);
+          disposers = [];
+          items = [];
+          mapped = [];
+          len = 0;
+          indexes && (indexes = []);
+        }
+        if (options.fallback) {
+          items = [FALLBACK];
+          mapped[0] = createRoot(disposer => {
+            disposers[0] = disposer;
+            return options.fallback();
+          });
+          len = 1;
+        }
+      }
+      else if (len === 0) {
+        mapped = new Array(newLen);
+        for (j = 0; j < newLen; j++) {
+          items[j] = newItems[j];
+          mapped[j] = createRoot(mapper);
+        }
+        len = newLen;
+      } else {
+        temp = new Array(newLen);
+        tempdisposers = new Array(newLen);
+        indexes && (tempIndexes = new Array(newLen));
+        for (start = 0, end = Math.min(len, newLen); start < end && items[start] === newItems[start]; start++);
+        for (end = len - 1, newEnd = newLen - 1; end >= start && newEnd >= start && items[end] === newItems[newEnd]; end--, newEnd--) {
+          temp[newEnd] = mapped[end];
+          tempdisposers[newEnd] = disposers[end];
+          indexes && (tempIndexes[newEnd] = indexes[end]);
+        }
+        newIndices = new Map();
+        newIndicesNext = new Array(newEnd + 1);
+        for (j = newEnd; j >= start; j--) {
+          item = newItems[j];
+          i = newIndices.get(item);
+          newIndicesNext[j] = i === undefined ? -1 : i;
+          newIndices.set(item, j);
+        }
+        for (i = start; i <= end; i++) {
+          item = items[i];
+          j = newIndices.get(item);
+          if (j !== undefined && j !== -1) {
+            temp[j] = mapped[i];
+            tempdisposers[j] = disposers[i];
+            indexes && (tempIndexes[j] = indexes[i]);
+            j = newIndicesNext[j];
+            newIndices.set(item, j);
+          } else disposers[i]();
+        }
+        for (j = start; j < newLen; j++) {
+          if (j in temp) {
+            mapped[j] = temp[j];
+            disposers[j] = tempdisposers[j];
+            if (indexes) {
+              indexes[j] = tempIndexes[j];
+              indexes[j](j);
+            }
+          } else mapped[j] = createRoot(mapper);
+        }
+        mapped = mapped.slice(0, len = newLen);
+        items = newItems.slice(0);
+      }
+      return mapped;
+    });
+    function mapper(disposer) {
+      disposers[j] = disposer;
+      if (indexes) {
+        const [s, set] = createSignal(j);
+        indexes[j] = set;
+        return mapFn(newItems[j], s);
+      }
+      return mapFn(newItems[j]);
+    }
+  };
+}
 function createComponent(Comp, props) {
   return untrack(() => Comp(props || {}));
 }
 
 const narrowedError = name => `Stale read from <${name}>.`;
+function For(props) {
+  const fallback = "fallback" in props && {
+    fallback: () => props.fallback
+  };
+  return createMemo(mapArray(() => props.each, props.children, fallback || undefined));
+}
 function Show(props) {
   const keyed = props.keyed;
   const conditionValue = createMemo(() => props.when, undefined, undefined);
@@ -637,11 +746,55 @@ function cleanChildren(parent, current, marker, replacement) {
   return [node];
 }
 
-const PANEL_WIDTH = 460;
-const PANEL_HEIGHT = 290;
-const HOVER_DELAY = 120;
-const HIDE_DELAY = 300;
-const BLOCKED_ROUTES = new Set(['directory', 'downloads', 'jobs', 'p', 'search', 'settings', 'subscriptions', 'turbo', 'wallet', 'videos']);
+const DEFAULT_PANEL_WIDTH = 460;
+const DEFAULT_PANEL_HEIGHT = 290;
+const DEFAULT_HOVER_DELAY = 500;
+const DEFAULT_HIDE_DELAY = 300;
+const DEFAULT_BLOCKED_ROUTES = ['directory', 'downloads', 'jobs', 'p', 'search', 'settings', 'subscriptions', 'turbo', 'wallet', 'videos'];
+function loadSetting(key, fallback) {
+  try {
+    const val = GM_getValue(key, undefined);
+    if (val !== undefined) return val;
+  } catch (_unused) {/* noop */}
+  return fallback;
+}
+function saveSetting(key, value) {
+  try {
+    GM_setValue(key, value);
+  } catch (_unused2) {/* noop */}
+}
+const [panelWidth, _setPanelWidth] = createSignal(loadSetting('panelWidth', DEFAULT_PANEL_WIDTH));
+const [panelHeight, _setPanelHeight] = createSignal(loadSetting('panelHeight', DEFAULT_PANEL_HEIGHT));
+const [hoverDelay, _setHoverDelay] = createSignal(loadSetting('hoverDelay', DEFAULT_HOVER_DELAY));
+const [hideDelay, _setHideDelay] = createSignal(loadSetting('hideDelay', DEFAULT_HIDE_DELAY));
+const [blockedRoutes, _setBlockedRoutes] = createSignal(loadSetting('blockedRoutes', DEFAULT_BLOCKED_ROUTES));
+function setPanelWidth(v) {
+  _setPanelWidth(v);
+  saveSetting('panelWidth', v);
+}
+function setPanelHeight(v) {
+  _setPanelHeight(v);
+  saveSetting('panelHeight', v);
+}
+function setHoverDelay(v) {
+  _setHoverDelay(v);
+  saveSetting('hoverDelay', v);
+}
+function setHideDelay(v) {
+  _setHideDelay(v);
+  saveSetting('hideDelay', v);
+}
+function setBlockedRoutes(v) {
+  _setBlockedRoutes(v);
+  saveSetting('blockedRoutes', v);
+}
+function resetAllSettings() {
+  setPanelWidth(DEFAULT_PANEL_WIDTH);
+  setPanelHeight(DEFAULT_PANEL_HEIGHT);
+  setHoverDelay(DEFAULT_HOVER_DELAY);
+  setHideDelay(DEFAULT_HIDE_DELAY);
+  setBlockedRoutes([...DEFAULT_BLOCKED_ROUTES]);
+}
 
 function getTwitchParent() {
   return window.location.hostname;
@@ -658,7 +811,8 @@ function extractChannelLoginFromLink(a) {
   const parts = clean.split('/').filter(Boolean);
   if (!parts.length) return null;
   const login = parts[0];
-  if (BLOCKED_ROUTES.has(login)) return null;
+  const blocked = new Set(blockedRoutes());
+  if (blocked.has(login)) return null;
   if (!/^[a-z0-9_]{2,25}$/i.test(login)) return null;
   return login;
 }
@@ -683,8 +837,8 @@ function useDrag(onDragEndOutside) {
     e.preventDefault();
     let left = e.clientX - dragOffsetX;
     let top = e.clientY - dragOffsetY;
-    left = Math.max(0, Math.min(window.innerWidth - PANEL_WIDTH, left));
-    top = Math.max(0, Math.min(window.innerHeight - PANEL_HEIGHT, top));
+    left = Math.max(0, Math.min(window.innerWidth - panelWidth(), left));
+    top = Math.max(0, Math.min(window.innerHeight - panelHeight(), top));
     currentPanelRef.style.left = `${left}px`;
     currentPanelRef.style.top = `${top}px`;
   };
@@ -741,7 +895,7 @@ function useTimers() {
     hideTimer = window.setTimeout(() => {
       callback();
       hideTimer = null;
-    }, HIDE_DELAY);
+    }, hideDelay());
   };
   const setHoverTimer = (callback, delay) => {
     cancelHover();
@@ -768,6 +922,7 @@ function usePreviewPanel() {
   const [isLoading, setIsLoading] = createSignal(false);
   const [isVisible, setIsVisible] = createSignal(false);
   const [isPinned, setIsPinned] = createSignal(false);
+  const [showSettings, setShowSettings] = createSignal(false);
   let iframeEl = null;
   let panelRef;
   const timers = useTimers();
@@ -799,11 +954,11 @@ function usePreviewPanel() {
     if (!panelRef) return;
     let left = linkRect.right + 15;
     let top = linkRect.top - 20;
-    if (left + PANEL_WIDTH > window.innerWidth) {
-      left = linkRect.left - PANEL_WIDTH - 15;
+    if (left + panelWidth() > window.innerWidth) {
+      left = linkRect.left - panelWidth() - 15;
     }
-    if (top + PANEL_HEIGHT > window.innerHeight) {
-      top = window.innerHeight - PANEL_HEIGHT - 10;
+    if (top + panelHeight() > window.innerHeight) {
+      top = window.innerHeight - panelHeight() - 10;
     }
     if (top < 10) top = 10;
     panelRef.style.left = `${left}px`;
@@ -819,7 +974,7 @@ function usePreviewPanel() {
     timers.setHoverTimer(() => {
       const rect = a.getBoundingClientRect();
       showPanel(login, rect);
-    }, HOVER_DELAY);
+    }, hoverDelay());
   };
   const onMouseOut = ev => {
     const a = findAnchorFromTarget(ev.target);
@@ -836,6 +991,9 @@ function usePreviewPanel() {
   const togglePin = () => {
     setIsPinned(!isPinned());
   };
+  const toggleSettings = () => {
+    setShowSettings(!showSettings());
+  };
   const handlePanelMouseEnter = () => {
     timers.cancelHide();
   };
@@ -847,8 +1005,6 @@ function usePreviewPanel() {
     timers.cancelHide();
     drag.onDragStart(e, panelRef);
   };
-
-  // Register global listeners
   window.addEventListener('mouseover', onMouseOver, true);
   window.addEventListener('mouseout', onMouseOut, true);
   onCleanup(() => {
@@ -862,23 +1018,22 @@ function usePreviewPanel() {
     }
   });
   return {
-    // Signals
     getChannel,
     isLoading,
     isVisible,
     isPinned,
     isDragging: drag.isDragging,
-    // Refs
+    showSettings,
     setIframeRef: el => {
       iframeEl = el;
     },
     setPanelRef: el => {
       panelRef = el;
     },
-    // Actions
     hidePanel,
     openInTwitch,
     togglePin,
+    toggleSettings,
     handlePanelMouseEnter,
     handlePanelMouseLeave,
     handleDragStart
@@ -901,8 +1056,8 @@ function panelStyle(isVisible, isDragging, hasChannel) {
     position: 'fixed',
     'z-index': 999999,
     display: hasChannel ? 'block' : 'none',
-    width: `${PANEL_WIDTH}px`,
-    height: `${PANEL_HEIGHT}px`,
+    width: `${panelWidth()}px`,
+    height: `${panelHeight()}px`,
     background: '#18181b',
     border: '1px solid #323237',
     'border-radius': '12px',
@@ -1016,60 +1171,69 @@ function removeHover(e) {
   e.currentTarget.style.background = 'transparent';
 }
 
-var _tmpl$$1 = /*#__PURE__*/template(`<svg width=16 height=16 viewBox="0 0 24 24"fill=none stroke=currentColor stroke-width=2><circle cx=12 cy=5 r=1></circle><circle cx=19 cy=5 r=1></circle><circle cx=5 cy=5 r=1></circle><circle cx=12 cy=12 r=1></circle><circle cx=19 cy=12 r=1></circle><circle cx=5 cy=12 r=1></circle><circle cx=12 cy=19 r=1></circle><circle cx=19 cy=19 r=1></circle><circle cx=5 cy=19 r=1>`),
-  _tmpl$2$1 = /*#__PURE__*/template(`<svg width=16 height=16 viewBox="0 0 24 24"stroke=currentColor stroke-width=2><path d="M12 17v5"></path><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z">`),
-  _tmpl$3 = /*#__PURE__*/template(`<svg width=16 height=16 viewBox="0 0 24 24"fill=none stroke=currentColor stroke-width=2><path d="M15 3h6v6"></path><path d="M10 14 21 3"></path><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6">`),
-  _tmpl$4 = /*#__PURE__*/template(`<svg width=16 height=16 viewBox="0 0 24 24"fill=none stroke=currentColor stroke-width=2><circle cx=12 cy=12 r=10></circle><path d="m15 9-6 6"></path><path d="m9 9 6 6">`),
-  _tmpl$5 = /*#__PURE__*/template(`<div><div><div></div><span></span><span>LIVE</span></div><button title="Drag to move"></button><div><button></button><button title="Open in new tab"></button><button title=Close>`);
+var _tmpl$$2 = /*#__PURE__*/template(`<svg width=16 height=16 viewBox="0 0 24 24"fill=none stroke=currentColor stroke-width=2><circle cx=12 cy=5 r=1></circle><circle cx=19 cy=5 r=1></circle><circle cx=5 cy=5 r=1></circle><circle cx=12 cy=12 r=1></circle><circle cx=19 cy=12 r=1></circle><circle cx=5 cy=12 r=1></circle><circle cx=12 cy=19 r=1></circle><circle cx=19 cy=19 r=1></circle><circle cx=5 cy=19 r=1>`),
+  _tmpl$2$2 = /*#__PURE__*/template(`<svg width=16 height=16 viewBox="0 0 24 24"stroke=currentColor stroke-width=2><path d="M12 17v5"></path><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z">`),
+  _tmpl$3 = /*#__PURE__*/template(`<svg xmlns=http://www.w3.org/2000/svg width=16 height=16 viewBox="0 0 24 24"fill=none stroke=currentColor stroke-width=2 stroke-linecap=round stroke-linejoin=round><path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"></path><circle cx=12 cy=12 r=3>`),
+  _tmpl$4 = /*#__PURE__*/template(`<svg width=16 height=16 viewBox="0 0 24 24"fill=none stroke=currentColor stroke-width=2><path d="M15 3h6v6"></path><path d="M10 14 21 3"></path><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6">`),
+  _tmpl$5 = /*#__PURE__*/template(`<svg width=16 height=16 viewBox="0 0 24 24"fill=none stroke=currentColor stroke-width=2><circle cx=12 cy=12 r=10></circle><path d="m15 9-6 6"></path><path d="m9 9 6 6">`),
+  _tmpl$6 = /*#__PURE__*/template(`<div><div><div></div><span></span><span>LIVE</span></div><button title="Drag to move"></button><div><button></button><button title=Settings></button><button title="Open in new tab"></button><button title=Close>`);
 function DragIcon() {
-  return _tmpl$$1();
+  return _tmpl$$2();
 }
 function PinIcon(props) {
   return (() => {
-    var _el$2 = _tmpl$2$1();
+    var _el$2 = _tmpl$2$2();
     createRenderEffect(() => setAttribute(_el$2, "fill", props.filled ? 'currentColor' : 'none'));
     return _el$2;
   })();
 }
-function ExternalLinkIcon() {
+function SettingsIcon() {
   return _tmpl$3();
 }
-function CloseIcon() {
+function ExternalLinkIcon() {
   return _tmpl$4();
+}
+function CloseIcon() {
+  return _tmpl$5();
 }
 function HeaderBar(props) {
   return (() => {
-    var _el$5 = _tmpl$5(),
-      _el$6 = _el$5.firstChild,
+    var _el$6 = _tmpl$6(),
       _el$7 = _el$6.firstChild,
-      _el$8 = _el$7.nextSibling,
+      _el$8 = _el$7.firstChild,
       _el$9 = _el$8.nextSibling,
-      _el$0 = _el$6.nextSibling,
-      _el$1 = _el$0.nextSibling,
-      _el$10 = _el$1.firstChild,
-      _el$11 = _el$10.nextSibling,
-      _el$12 = _el$11.nextSibling;
-    insert(_el$8, () => props.channel());
-    addEventListener(_el$0, "mouseleave", removeHover);
-    addEventListener(_el$0, "mouseenter", applyHover);
-    addEventListener(_el$0, "mousedown", props.onDragStart, true);
-    insert(_el$0, createComponent(DragIcon, {}));
-    addEventListener(_el$10, "mouseleave", removeHover);
-    addEventListener(_el$10, "mouseenter", applyHover);
-    addEventListener(_el$10, "click", props.onTogglePin, true);
-    insert(_el$10, createComponent(PinIcon, {
+      _el$0 = _el$9.nextSibling,
+      _el$1 = _el$7.nextSibling,
+      _el$10 = _el$1.nextSibling,
+      _el$11 = _el$10.firstChild,
+      _el$12 = _el$11.nextSibling,
+      _el$13 = _el$12.nextSibling,
+      _el$14 = _el$13.nextSibling;
+    insert(_el$9, () => props.channel());
+    addEventListener(_el$1, "mouseleave", removeHover);
+    addEventListener(_el$1, "mouseenter", applyHover);
+    addEventListener(_el$1, "mousedown", props.onDragStart, true);
+    insert(_el$1, createComponent(DragIcon, {}));
+    addEventListener(_el$11, "mouseleave", removeHover);
+    addEventListener(_el$11, "mouseenter", applyHover);
+    addEventListener(_el$11, "click", props.onTogglePin, true);
+    insert(_el$11, createComponent(PinIcon, {
       get filled() {
         return props.isPinned();
       }
     }));
-    addEventListener(_el$11, "mouseleave", removeHover);
-    addEventListener(_el$11, "mouseenter", applyHover);
-    addEventListener(_el$11, "click", props.onOpenInTwitch, true);
-    insert(_el$11, createComponent(ExternalLinkIcon, {}));
     addEventListener(_el$12, "mouseleave", removeHover);
     addEventListener(_el$12, "mouseenter", applyHover);
-    addEventListener(_el$12, "click", props.onClose, true);
-    insert(_el$12, createComponent(CloseIcon, {}));
+    addEventListener(_el$12, "click", props.onOpenSettings, true);
+    insert(_el$12, createComponent(SettingsIcon, {}));
+    addEventListener(_el$13, "mouseleave", removeHover);
+    addEventListener(_el$13, "mouseenter", applyHover);
+    addEventListener(_el$13, "click", props.onOpenInTwitch, true);
+    insert(_el$13, createComponent(ExternalLinkIcon, {}));
+    addEventListener(_el$14, "mouseleave", removeHover);
+    addEventListener(_el$14, "mouseenter", applyHover);
+    addEventListener(_el$14, "click", props.onClose, true);
+    insert(_el$14, createComponent(CloseIcon, {}));
     createRenderEffect(_p$ => {
       var _v$ = headerStyle,
         _v$2 = headerLeftStyle,
@@ -1081,18 +1245,20 @@ function HeaderBar(props) {
         _v$8 = iconButtonStyle,
         _v$9 = props.isPinned() ? 'Unpin' : 'Pin',
         _v$0 = iconButtonStyle,
-        _v$1 = iconButtonStyle;
-      _p$.e = style(_el$5, _v$, _p$.e);
-      _p$.t = style(_el$6, _v$2, _p$.t);
-      _p$.a = style(_el$7, _v$3, _p$.a);
-      _p$.o = style(_el$8, _v$4, _p$.o);
-      _p$.i = style(_el$9, _v$5, _p$.i);
-      _p$.n = style(_el$0, _v$6, _p$.n);
-      _p$.s = style(_el$1, _v$7, _p$.s);
-      _p$.h = style(_el$10, _v$8, _p$.h);
-      _v$9 !== _p$.r && setAttribute(_el$10, "title", _p$.r = _v$9);
-      _p$.d = style(_el$11, _v$0, _p$.d);
-      _p$.l = style(_el$12, _v$1, _p$.l);
+        _v$1 = iconButtonStyle,
+        _v$10 = iconButtonStyle;
+      _p$.e = style(_el$6, _v$, _p$.e);
+      _p$.t = style(_el$7, _v$2, _p$.t);
+      _p$.a = style(_el$8, _v$3, _p$.a);
+      _p$.o = style(_el$9, _v$4, _p$.o);
+      _p$.i = style(_el$0, _v$5, _p$.i);
+      _p$.n = style(_el$1, _v$6, _p$.n);
+      _p$.s = style(_el$10, _v$7, _p$.s);
+      _p$.h = style(_el$11, _v$8, _p$.h);
+      _v$9 !== _p$.r && setAttribute(_el$11, "title", _p$.r = _v$9);
+      _p$.d = style(_el$12, _v$0, _p$.d);
+      _p$.l = style(_el$13, _v$1, _p$.l);
+      _p$.u = style(_el$14, _v$10, _p$.u);
       return _p$;
     }, {
       e: undefined,
@@ -1105,18 +1271,311 @@ function HeaderBar(props) {
       h: undefined,
       r: undefined,
       d: undefined,
-      l: undefined
+      l: undefined,
+      u: undefined
     });
-    return _el$5;
+    return _el$6;
   })();
 }
 delegateEvents(["mousedown", "click"]);
 
-var _tmpl$ = /*#__PURE__*/template(`<div><div></div><span>Carregando...`),
-  _tmpl$2 = /*#__PURE__*/template(`<div><iframe allow="autoplay; fullscreen"allowfullscreen loading=eager></iframe><style>\n        @keyframes pulse \{\n          0%, 100% \{ opacity: 1; }\n          50% \{ opacity: 0.5; }\n        }\n        @keyframes spin \{\n          to \{ transform: rotate(360deg); }\n        }\n      `, true, false, false);
+var _tmpl$$1 = /*#__PURE__*/template(`<div><div><div><span>Settings</span><button><svg width=18 height=18 viewBox="0 0 24 24"fill=none stroke=currentColor stroke-width=2><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button></div><div><label>Blocked Routes</label><textarea></textarea><div>Comma-separated list of routes to ignore</div></div><div><button>Reset Defaults</button><div style=flex:1></div><button>Cancel</button><button>Save`),
+  _tmpl$2$1 = /*#__PURE__*/template(`<div><label></label><input><div>`);
+const FONT = 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+const overlayStyle = {
+  position: 'fixed',
+  top: 0,
+  left: 0,
+  width: '100vw',
+  height: '100vh',
+  background: 'rgba(0, 0, 0, 0.7)',
+  'z-index': 9999999,
+  display: 'flex',
+  'align-items': 'center',
+  'justify-content': 'center',
+  'backdrop-filter': 'blur(4px)'
+};
+const modalStyle = {
+  background: '#1f1f23',
+  border: '1px solid #323237',
+  'border-radius': '12px',
+  padding: '24px',
+  width: '380px',
+  'max-height': '80vh',
+  'overflow-y': 'auto',
+  color: '#efeff1',
+  'font-family': FONT,
+  'box-shadow': '0 16px 48px rgba(0, 0, 0, 0.8)'
+};
+const titleStyle = {
+  'font-size': '18px',
+  'font-weight': '700',
+  margin: '0 0 20px 0',
+  display: 'flex',
+  'align-items': 'center',
+  'justify-content': 'space-between'
+};
+const fieldStyle = {
+  'margin-bottom': '16px'
+};
+const labelStyle = {
+  display: 'block',
+  'font-size': '12px',
+  'font-weight': '600',
+  color: '#adadb8',
+  'margin-bottom': '6px',
+  'text-transform': 'uppercase',
+  'letter-spacing': '0.5px'
+};
+const inputStyle = {
+  width: '100%',
+  padding: '8px 12px',
+  background: '#0e0e10',
+  border: '1px solid #323237',
+  'border-radius': '6px',
+  color: '#efeff1',
+  'font-size': '14px',
+  'font-family': FONT,
+  outline: 'none',
+  'box-sizing': 'border-box',
+  transition: 'border-color 0.2s'
+};
+const textareaStyle = _extends({}, inputStyle, {
+  'min-height': '80px',
+  resize: 'vertical'
+});
+const hintStyle = {
+  'font-size': '11px',
+  color: '#71717a',
+  'margin-top': '4px'
+};
+const btnRowStyle = {
+  display: 'flex',
+  gap: '8px',
+  'margin-top': '20px',
+  'justify-content': 'flex-end'
+};
+const btnBase = {
+  padding: '8px 16px',
+  'border-radius': '6px',
+  border: 'none',
+  'font-size': '13px',
+  'font-weight': '600',
+  'font-family': FONT,
+  cursor: 'pointer',
+  transition: 'background 0.2s'
+};
+const btnPrimary = _extends({}, btnBase, {
+  background: '#9147ff',
+  color: '#fff'
+});
+const btnSecondary = _extends({}, btnBase, {
+  background: '#323237',
+  color: '#efeff1'
+});
+const btnDanger = _extends({}, btnBase, {
+  background: 'transparent',
+  color: '#e91916',
+  padding: '8px 12px'
+});
+const closeBtnStyle = {
+  background: 'transparent',
+  border: 'none',
+  color: '#efeff1',
+  cursor: 'pointer',
+  padding: '4px',
+  'border-radius': '6px',
+  display: 'flex',
+  'align-items': 'center',
+  'justify-content': 'center'
+};
+function SettingsPanel(props) {
+  const [width, setWidth] = createSignal(String(panelWidth()));
+  const [height, setHeight] = createSignal(String(panelHeight()));
+  const [hover, setHover] = createSignal(String(hoverDelay()));
+  const [hide, setHide] = createSignal(String(hideDelay()));
+  const [routes, setRoutes] = createSignal(blockedRoutes().join(', '));
+  const handleSave = () => {
+    const w = parseInt(width(), 10);
+    const h = parseInt(height(), 10);
+    const hov = parseInt(hover(), 10);
+    const hid = parseInt(hide(), 10);
+    if (!isNaN(w) && w >= 200 && w <= 1200) setPanelWidth(w);
+    if (!isNaN(h) && h >= 150 && h <= 800) setPanelHeight(h);
+    if (!isNaN(hov) && hov >= 0 && hov <= 5000) setHoverDelay(hov);
+    if (!isNaN(hid) && hid >= 0 && hid <= 5000) setHideDelay(hid);
+    const parsed = routes().split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+    setBlockedRoutes(parsed);
+    props.onClose();
+  };
+  const handleReset = () => {
+    resetAllSettings();
+    setWidth(String(DEFAULT_PANEL_WIDTH));
+    setHeight(String(DEFAULT_PANEL_HEIGHT));
+    setHover(String(DEFAULT_HOVER_DELAY));
+    setHide(String(DEFAULT_HIDE_DELAY));
+    setRoutes(blockedRoutes().join(', '));
+  };
+  const handleOverlayClick = e => {
+    if (e.target === e.currentTarget) props.onClose();
+  };
+  const fields = [{
+    label: 'Panel Width (px)',
+    value: width,
+    setter: setWidth,
+    hint: `Min: 200, Max: 1200, Default: ${DEFAULT_PANEL_WIDTH}`,
+    type: 'number'
+  }, {
+    label: 'Panel Height (px)',
+    value: height,
+    setter: setHeight,
+    hint: `Min: 150, Max: 800, Default: ${DEFAULT_PANEL_HEIGHT}`,
+    type: 'number'
+  }, {
+    label: 'Hover Delay (ms)',
+    value: hover,
+    setter: setHover,
+    hint: `Time before preview appears. Default: ${DEFAULT_HOVER_DELAY}`,
+    type: 'number'
+  }, {
+    label: 'Hide Delay (ms)',
+    value: hide,
+    setter: setHide,
+    hint: `Time before preview hides. Default: ${DEFAULT_HIDE_DELAY}`,
+    type: 'number'
+  }];
+  return (() => {
+    var _el$ = _tmpl$$1(),
+      _el$2 = _el$.firstChild,
+      _el$3 = _el$2.firstChild,
+      _el$4 = _el$3.firstChild,
+      _el$5 = _el$4.nextSibling,
+      _el$6 = _el$3.nextSibling,
+      _el$7 = _el$6.firstChild,
+      _el$8 = _el$7.nextSibling,
+      _el$9 = _el$8.nextSibling,
+      _el$0 = _el$6.nextSibling,
+      _el$1 = _el$0.firstChild,
+      _el$10 = _el$1.nextSibling,
+      _el$11 = _el$10.nextSibling,
+      _el$12 = _el$11.nextSibling;
+    _el$.$$click = handleOverlayClick;
+    style(_el$, overlayStyle);
+    _el$2.$$click = e => e.stopPropagation();
+    style(_el$2, modalStyle);
+    style(_el$3, titleStyle);
+    _el$5.addEventListener("mouseleave", e => {
+      e.currentTarget.style.background = 'transparent';
+    });
+    _el$5.addEventListener("mouseenter", e => {
+      e.currentTarget.style.background = 'rgba(255,255,255,0.1)';
+    });
+    addEventListener(_el$5, "click", props.onClose, true);
+    style(_el$5, closeBtnStyle);
+    insert(_el$2, createComponent(For, {
+      each: fields,
+      children: field => (() => {
+        var _el$13 = _tmpl$2$1(),
+          _el$14 = _el$13.firstChild,
+          _el$15 = _el$14.nextSibling,
+          _el$16 = _el$15.nextSibling;
+        insert(_el$14, () => field.label);
+        _el$15.addEventListener("blur", e => {
+          e.currentTarget.style['border-color'] = '#323237';
+        });
+        _el$15.addEventListener("focus", e => {
+          e.currentTarget.style['border-color'] = '#9147ff';
+        });
+        _el$15.$$input = e => field.setter(e.currentTarget.value);
+        insert(_el$16, () => field.hint);
+        createRenderEffect(_p$ => {
+          var _v$8 = fieldStyle,
+            _v$9 = labelStyle,
+            _v$0 = field.type,
+            _v$1 = inputStyle,
+            _v$10 = hintStyle;
+          _p$.e = style(_el$13, _v$8, _p$.e);
+          _p$.t = style(_el$14, _v$9, _p$.t);
+          _v$0 !== _p$.a && setAttribute(_el$15, "type", _p$.a = _v$0);
+          _p$.o = style(_el$15, _v$1, _p$.o);
+          _p$.i = style(_el$16, _v$10, _p$.i);
+          return _p$;
+        }, {
+          e: undefined,
+          t: undefined,
+          a: undefined,
+          o: undefined,
+          i: undefined
+        });
+        createRenderEffect(() => _el$15.value = field.value());
+        return _el$13;
+      })()
+    }), _el$6);
+    _el$8.addEventListener("blur", e => {
+      e.currentTarget.style['border-color'] = '#323237';
+    });
+    _el$8.addEventListener("focus", e => {
+      e.currentTarget.style['border-color'] = '#9147ff';
+    });
+    _el$8.$$input = e => setRoutes(e.currentTarget.value);
+    style(_el$0, btnRowStyle);
+    _el$1.addEventListener("mouseleave", e => {
+      e.currentTarget.style.background = 'transparent';
+    });
+    _el$1.addEventListener("mouseenter", e => {
+      e.currentTarget.style.background = 'rgba(233, 25, 22, 0.1)';
+    });
+    _el$1.$$click = handleReset;
+    _el$11.addEventListener("mouseleave", e => {
+      e.currentTarget.style.background = '#323237';
+    });
+    _el$11.addEventListener("mouseenter", e => {
+      e.currentTarget.style.background = '#3f3f46';
+    });
+    addEventListener(_el$11, "click", props.onClose, true);
+    _el$12.addEventListener("mouseleave", e => {
+      e.currentTarget.style.background = '#9147ff';
+    });
+    _el$12.addEventListener("mouseenter", e => {
+      e.currentTarget.style.background = '#772ce8';
+    });
+    _el$12.$$click = handleSave;
+    createRenderEffect(_p$ => {
+      var _v$ = fieldStyle,
+        _v$2 = labelStyle,
+        _v$3 = textareaStyle,
+        _v$4 = hintStyle,
+        _v$5 = btnDanger,
+        _v$6 = btnSecondary,
+        _v$7 = btnPrimary;
+      _p$.e = style(_el$6, _v$, _p$.e);
+      _p$.t = style(_el$7, _v$2, _p$.t);
+      _p$.a = style(_el$8, _v$3, _p$.a);
+      _p$.o = style(_el$9, _v$4, _p$.o);
+      _p$.i = style(_el$1, _v$5, _p$.i);
+      _p$.n = style(_el$11, _v$6, _p$.n);
+      _p$.s = style(_el$12, _v$7, _p$.s);
+      return _p$;
+    }, {
+      e: undefined,
+      t: undefined,
+      a: undefined,
+      o: undefined,
+      i: undefined,
+      n: undefined,
+      s: undefined
+    });
+    createRenderEffect(() => _el$8.value = routes());
+    return _el$;
+  })();
+}
+delegateEvents(["click", "input"]);
+
+var _tmpl$ = /*#__PURE__*/template(`<div><div></div><span>Loading...`),
+  _tmpl$2 = /*#__PURE__*/template(`<div><iframe allow="autoplay; fullscreen"allowfullscreen loading=eager></iframe><style>\n          @keyframes pulse \{\n            0%, 100% \{ opacity: 1; }\n            50% \{ opacity: 0.5; }\n          }\n          @keyframes spin \{\n            to \{ transform: rotate(360deg); }\n          }\n        `, true, false, false);
 function App() {
   const panel = usePreviewPanel();
-  return (() => {
+  return [(() => {
     var _el$ = _tmpl$2(),
       _el$5 = _el$.firstChild;
     addEventListener(_el$, "mouseleave", panel.handlePanelMouseLeave);
@@ -1135,6 +1594,9 @@ function App() {
       },
       get onTogglePin() {
         return panel.togglePin;
+      },
+      get onOpenSettings() {
+        return panel.toggleSettings;
       },
       get onOpenInTwitch() {
         return panel.openInTwitch;
@@ -1180,7 +1642,18 @@ function App() {
       t: undefined
     });
     return _el$;
-  })();
+  })(), createComponent(Show, {
+    get when() {
+      return panel.showSettings();
+    },
+    get children() {
+      return createComponent(SettingsPanel, {
+        get onClose() {
+          return panel.toggleSettings;
+        }
+      });
+    }
+  })];
 }
 const root = document.createElement('div');
 document.body.appendChild(root);

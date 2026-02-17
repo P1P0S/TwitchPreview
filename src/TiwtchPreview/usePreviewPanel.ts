@@ -14,6 +14,7 @@ export function usePreviewPanel() {
   const [isLoading, setIsLoading] = createSignal(false);
   const [isVisible, setIsVisible] = createSignal(false);
   const [isPinned, setIsPinned] = createSignal(false);
+  const [showSettings, setShowSettings] = createSignal(false);
 
   let iframeEl: HTMLIFrameElement | null = null;
   let panelRef: HTMLDivElement | undefined;
@@ -55,11 +56,11 @@ export function usePreviewPanel() {
     let left = linkRect.right + 15;
     let top = linkRect.top - 20;
 
-    if (left + PANEL_WIDTH > window.innerWidth) {
-      left = linkRect.left - PANEL_WIDTH - 15;
+    if (left + PANEL_WIDTH() > window.innerWidth) {
+      left = linkRect.left - PANEL_WIDTH() - 15;
     }
-    if (top + PANEL_HEIGHT > window.innerHeight) {
-      top = window.innerHeight - PANEL_HEIGHT - 10;
+    if (top + PANEL_HEIGHT() > window.innerHeight) {
+      top = window.innerHeight - PANEL_HEIGHT() - 10;
     }
     if (top < 10) top = 10;
 
@@ -81,7 +82,7 @@ export function usePreviewPanel() {
     timers.setHoverTimer(() => {
       const rect = a.getBoundingClientRect();
       showPanel(login, rect);
-    }, HOVER_DELAY);
+    }, HOVER_DELAY());
   };
 
   const onMouseOut = (ev: MouseEvent) => {
@@ -103,6 +104,10 @@ export function usePreviewPanel() {
     setIsPinned(!isPinned());
   };
 
+  const toggleSettings = () => {
+    setShowSettings(!showSettings());
+  };
+
   const handlePanelMouseEnter = () => {
     timers.cancelHide();
   };
@@ -117,7 +122,6 @@ export function usePreviewPanel() {
     drag.onDragStart(e, panelRef);
   };
 
-  // Register global listeners
   window.addEventListener('mouseover', onMouseOver, true);
   window.addEventListener('mouseout', onMouseOut, true);
 
@@ -132,14 +136,13 @@ export function usePreviewPanel() {
   });
 
   return {
-    // Signals
     getChannel,
     isLoading,
     isVisible,
     isPinned,
     isDragging: drag.isDragging,
+    showSettings,
 
-    // Refs
     setIframeRef: (el: HTMLIFrameElement) => {
       iframeEl = el;
     },
@@ -147,10 +150,10 @@ export function usePreviewPanel() {
       panelRef = el;
     },
 
-    // Actions
     hidePanel,
     openInTwitch,
     togglePin,
+    toggleSettings,
     handlePanelMouseEnter,
     handlePanelMouseLeave,
     handleDragStart,

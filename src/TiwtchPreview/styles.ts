@@ -13,8 +13,8 @@ export function panelStyle(
     position: 'fixed',
     'z-index': 999999,
     display: hasChannel ? 'block' : 'none',
-    width: `${PANEL_WIDTH}px`,
-    height: `${PANEL_HEIGHT}px`,
+    width: `${PANEL_WIDTH()}px`,
+    height: `${PANEL_HEIGHT()}px`,
     background: '#18181b',
     border: '1px solid #323237',
     'border-radius': '12px',
@@ -143,3 +143,5 @@ export function applyHover(e: MouseEvent & { currentTarget: HTMLElement }) {
 export function removeHover(e: MouseEvent & { currentTarget: HTMLElement }) {
   e.currentTarget.style.background = 'transparent';
 }
+
+export { FONT_STACK };

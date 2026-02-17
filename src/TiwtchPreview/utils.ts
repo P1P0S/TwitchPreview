@@ -21,7 +21,8 @@ export function extractChannelLoginFromLink(
   if (!parts.length) return null;
 
   const login = parts[0];
-  if (BLOCKED_ROUTES.has(login)) return null;
+  const blocked = new Set(BLOCKED_ROUTES());
+  if (blocked.has(login)) return null;
   if (!/^[a-z0-9_]{2,25}$/i.test(login)) return null;
 
   return login;

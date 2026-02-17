@@ -31,7 +31,7 @@ export function useTimers(): TimerActions {
     hideTimer = window.setTimeout(() => {
       callback();
       hideTimer = null;
-    }, HIDE_DELAY);
+    }, HIDE_DELAY());
   };
 
   const setHoverTimer = (callback: () => void, delay: number) => {

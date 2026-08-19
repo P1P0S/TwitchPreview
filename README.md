@@ -1,16 +1,33 @@
-# Twitch Preview
+# TwitchPreview
 
-This is a userscript initiated from [@violentmonkey/generator-userscript](https://github.com/violentmonkey/generator-userscript).
+Live Twitch stream preview on hover.
 
-## Development
+Preview channels without opening them. Quickly check what's happening before switching streams.
 
-``` sh
-# Compile and watch
-$ npm run dev
+## Features
 
-# Build script
-$ npm run build
+- Hover a channel in the left sidebar to see a live preview
+- Pin/unpin the preview
+- Drag to move the panel
+- Open the channel in a new tab
 
-# Lint
-$ npm run lint
-```
+## Installation
+
+Install directly from Greasy Fork:
+
+👉 [Install TwitchPreview](https://greasyfork.org/en/scripts/566513-tiwtchpreview?utm_source=chatgpt.com)
+
+### Requirements
+
+- Firefox + Violentmonkey
+- Chrome/Chromium + Tampermonkey or Violentmonkey
+
+## Usage
+
+1. Open Twitch.
+2. Hover over supported channel elements.
+3. Watch live preview instantly.
+
+## Contributing
+
+Issues and pull requests are welcome.
